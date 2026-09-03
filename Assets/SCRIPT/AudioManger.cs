@@ -1,29 +1,24 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 
 public class AudioManger : MonoBehaviour
 {
     public AudioSource Solaraudio;
     public AudioClip[] Solarclip = new AudioClip[8];
-    public int Currentaudio = 0;
-    // Start is called before the first frame update
-    void Start()
-    {
-        Solaraudio.clip = Solarclip[Currentaudio];
-        Solaraudio.Play();
-        Currentaudio++;
 
+    // Plays the exact planet clip when called
+    public void PlayPlanetAudio(int index)
+    {
+        if (Solaraudio != null && index >= 0 && index < Solarclip.Length)
+        {
+            Solaraudio.Stop();
+            Solaraudio.clip = Solarclip[index];
+            Solaraudio.Play();
+        }
     }
 
-    // Update is called once per frame
-    void Update()
+    // Checks if the audio is still talking
+    public bool IsPlaying()
     {
-        if (!Solaraudio.isPlaying && Currentaudio < Solarclip.Length)
-        {
-            Solaraudio.clip = Solarclip[Currentaudio];
-            Solaraudio.Play();
-            Currentaudio++;
-        }
+        return Solaraudio != null && Solaraudio.isPlaying;
     }
 }
