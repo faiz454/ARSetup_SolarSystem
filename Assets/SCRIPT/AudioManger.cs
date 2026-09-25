@@ -3,7 +3,7 @@ using UnityEngine;
 public class AudioManger : MonoBehaviour
 {
     public AudioSource Solaraudio;
-    public AudioClip[] Solarclip = new AudioClip[8];
+    public AudioClip[] Solarclip = new AudioClip[9];
 
     // Plays the exact planet clip when called
     public void PlayPlanetAudio(int index)
