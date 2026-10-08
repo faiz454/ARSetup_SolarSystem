@@ -6,14 +6,23 @@ public class SolarSystemTour : MonoBehaviour
 {
     [Header("Planets in Order (Mercury to Neptune)")]
     [SerializeField] private List<Transform> planetTargets = new List<Transform>();
+
+    [Header("Moon References")]
     [SerializeField] private Transform moontarget;
     [SerializeField] private Animator moonAnimator;
+
+    [Header("Satellite References")]
+    [SerializeField] private Transform satelliteTarget;
+    [SerializeField] private Animator satelliteAnimator;
 
     [Header("Tour Settings")]
     [SerializeField] private float pauseAfterAudio = 1.0f;
     [SerializeField] private float transitionSpeed = 2f;
     [SerializeField] private float distanceFromCamera = 0.6f;
-    [SerializeField] private float moonDistanceFromCamera = 0.35f;
+
+    // Distances framed so Earth + orbiting bodies fit fully on screen
+    [SerializeField] private float moonDistanceFromCamera = 0.8f;
+    [SerializeField] private float satelliteDistanceFromCamera = 0.7f;
 
     [Header("Audio Reference")]
     public AudioManger audioManager;
@@ -31,7 +40,7 @@ public class SolarSystemTour : MonoBehaviour
     private Vector3 initialSpawnPosition;
     private bool isTourComplete = false;
     private bool isMoonAudioPlaying = false;
-
+    private bool isSatelliteAudioPlaying = false;
 
     private void Start()
     {
@@ -52,23 +61,35 @@ public class SolarSystemTour : MonoBehaviour
             sunCenter = (foundSun != null) ? foundSun : transform;
         }
 
-        if (moonAnimator == null && moontarget != null)
+        // Auto-assign parent animators if missing
+        if (moonAnimator == null && moontarget != null && moontarget.parent != null)
         {
-            if(moontarget.parent != null)
-            {
-                moonAnimator = moontarget.parent.GetComponent<Animator>();
-            }
+            moonAnimator = moontarget.parent.GetComponent<Animator>();
         }
 
-        // Hide Moon initially & disable its animator component
+        if (satelliteAnimator == null && satelliteTarget != null && satelliteTarget.parent != null)
+        {
+            satelliteAnimator = satelliteTarget.parent.GetComponent<Animator>();
+        }
+
+        // Ensure Moon is disabled initially
         if (moontarget != null)
         {
             moontarget.gameObject.SetActive(false);
         }
-
         if (moonAnimator != null)
         {
             moonAnimator.enabled = false;
+        }
+
+        // Ensure Satellite is disabled initially
+        if (satelliteTarget != null)
+        {
+            satelliteTarget.gameObject.SetActive(false);
+        }
+        if (satelliteAnimator != null)
+        {
+            satelliteAnimator.enabled = false;
         }
 
         StartCoroutine(StartTourRoutine());
@@ -76,14 +97,14 @@ public class SolarSystemTour : MonoBehaviour
 
     void Update()
     {
+        // 1. Planets Axial Spin & Sun Revolutions
         for (int i = 0; i < planetTargets.Count; i++)
         {
             if (planetTargets[i] == null) continue;
 
-            // Axial spin for planets
             planetTargets[i].Rotate(0f, axialSpinSpeed * Time.deltaTime, 0f, Space.Self);
 
-            // Revolve around Sun after the entire tour finishes
+            // Revolve around Sun after the full tour completes
             if (isTourComplete && sunCenter != null)
             {
                 float revSpeed = (i < revolutionSpeeds.Length) ? revolutionSpeeds[i] : 5f;
@@ -91,19 +112,25 @@ public class SolarSystemTour : MonoBehaviour
             }
         }
 
-        // Moon axial spin (ONLY when active AND audio is NOT playing)
+        // 2. Moon Axial Spin (ONLY when active AND audio is finished)
         if (moontarget != null && moontarget.gameObject.activeSelf && !isMoonAudioPlaying)
         {
             moontarget.Rotate(0f, axialSpinSpeed * Time.deltaTime, 0f, Space.Self);
+        }
+
+        // 3. Satellite Axial Spin (ONLY when active AND audio is finished)
+        if (satelliteTarget != null && satelliteTarget.gameObject.activeSelf && !isSatelliteAudioPlaying)
+        {
+            satelliteTarget.Rotate(0f, axialSpinSpeed * Time.deltaTime, 0f, Space.Self);
         }
     }
 
     private IEnumerator StartTourRoutine()
     {
-        // 1. Initial overview wait
+        // 1. Initial overview pause
         yield return new WaitForSeconds(4.0f);
 
-        // 2. Tour planets Mercury through Neptune
+        // 2. Tour Mercury through Neptune
         for (int i = 0; i < planetTargets.Count; i++)
         {
             Transform targetPlanet = planetTargets[i];
@@ -126,20 +153,21 @@ public class SolarSystemTour : MonoBehaviour
         yield return StartCoroutine(ReturnToInitialOverview());
         yield return new WaitForSeconds(overviewWaitTime);
 
-        // 4. Moon Focus, Audio, and Orbit Sequence
+        // 4. Moon Focus Sequence
         if (moontarget != null)
         {
-            // Unhide Moon
             moontarget.gameObject.SetActive(true);
 
-            // Freeze ALL Moon movement during focus/audio
+            // Mark audio playing so manual axial spin stops
             isMoonAudioPlaying = true;
+
+            // Pause animator orbit if present
             if (moonAnimator != null)
             {
                 moonAnimator.enabled = false;
             }
 
-            // Zoom camera directly to Moon
+            // Move the Solar System so Moon is centered in front of AR Camera
             yield return StartCoroutine(MovePlanetToCamera(moontarget, moonDistanceFromCamera));
 
             // Play Moon Audio
@@ -153,7 +181,7 @@ public class SolarSystemTour : MonoBehaviour
 
             yield return new WaitForSeconds(pauseAfterAudio);
 
-            // 5. Enable Animator & start orbit around Earth
+            // Resume Moon Orbit Animation & Spin AFTER audio finishes
             isMoonAudioPlaying = false;
             if (moonAnimator != null)
             {
@@ -161,15 +189,51 @@ public class SolarSystemTour : MonoBehaviour
                 moonAnimator.speed = 1f;
             }
 
-            // Watch Moon revolve around Earth in focus
             yield return new WaitForSeconds(3.0f);
-
-            // 6. Return back to full solar system overview
-            yield return StartCoroutine(ReturnToInitialOverview());
-            yield return new WaitForSeconds(overviewWaitTime);
         }
 
-        // 7. Enable planetary revolutions around Sun
+        // 5. Artificial Satellite Focus Sequence
+        if (satelliteTarget != null)
+        {
+            satelliteTarget.gameObject.SetActive(true);
+
+            isSatelliteAudioPlaying = true;
+
+            if (satelliteAnimator != null)
+            {
+                satelliteAnimator.enabled = false;
+            }
+
+            // Move Solar System so Satellite is centered in front of AR Camera
+            yield return StartCoroutine(MovePlanetToCamera(satelliteTarget, satelliteDistanceFromCamera));
+
+            // Play Satellite Audio clip
+            if (audioManager != null)
+            {
+                audioManager.PlaySatelliteAudio(0);
+                yield return null;
+                yield return null;
+                yield return new WaitWhile(() => audioManager.IsPlaying());
+            }
+
+            yield return new WaitForSeconds(pauseAfterAudio);
+
+            // Resume Satellite Orbit Animation AFTER audio finishes
+            isSatelliteAudioPlaying = false;
+            if (satelliteAnimator != null)
+            {
+                satelliteAnimator.enabled = true;
+                satelliteAnimator.speed = 1f;
+            }
+
+            yield return new WaitForSeconds(3.0f);
+        }
+
+        // 6. Return back to full system overview
+        yield return StartCoroutine(ReturnToInitialOverview());
+        yield return new WaitForSeconds(overviewWaitTime);
+
+        // 7. Complete tour: Enable planetary revolutions around Sun
         isTourComplete = true;
     }
 
